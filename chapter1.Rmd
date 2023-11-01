@@ -3,11 +3,20 @@
 
 *Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
 
+
+My GitHub [repository](https://github.com/johannamariia/IODS-project). 
+
+I have not used Rmd -files before, and only once worked with github overall. I followed the introductions 
+so i hope that i did everything right. I assume that i will find out if i did something wrong...
+I heard about the course via doctoral school email and was instantly curious about the course. I am excited about the course and want to learn how i can use R more versatile in my own work. 
+
+**Opinions on Exercise Set 1.**
+What were my favorite topics and what were most difficult ones? Overall the first weeks Exercise was just repetition of the old already familiar things. However, in the exercise there were a few terms and concepts that were slightly stranger to me and i have seen them being used but had not used myself. For example I have not used time variables before so it is good to gather more understanding about how those variables work and what are things to consider when using them. Another "new" thing is tibble, because i have used the term data frame before. The concept of tibble on the other hand was familiar and i have used the read_csv() command when reading in the data. 
+
 ```{r}
 # This is a so-called "R chunk" where you can write R code.
 
 date()
 
 ```
-The text continues here.
 
