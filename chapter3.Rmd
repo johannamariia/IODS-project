@@ -1,0 +1,329 @@
+---
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Chapter 3 Assignment 3, Logistic regression
+
+```{r}
+date()
+```
+
+## Libraries
+
+```{r}
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(boot) 
+
+```
+
+## Read the Data
+
+Read in the data that has been made in the previous data wrangling part.
+I will use the read_csv -command from the tidyverse -library to do that.
+
+```{r}
+
+#read in the data. read_csv -command assumes that the separator is , so there is no need for further explanations in the code
+data <- read_csv("data/alc.csv")
+
+#print out the column names
+colnames(data)
+```
+
+Data includes 35 columns and 370 rows.
+It includes answers from math and Portuguese language course students.
+First columns include some background information like school, gender, age, address, family size, romantic relationship, free time, activities etc.
+In addition the data sets includes information about workday and weekend alcohol consumption.
+Based on these two column answers there has been added columns, alc_use and high_use, to indicate how much alcohol person is drinking.
+And lastly there is columns G1, G2, and G3 that indicate for what grade did the person got after each period.
+
+## Background for the analysis
+
+I chose to do the analysis with absences, freetime, goout and studytime.
+
+My hypotheses are following:
+
+1.  increase in free time will mildly lead to higher alcohol consumption, because then you might have more time to do it.
+2.  Study time on the other hand might lower the amount of alcohol consumption because then person could use the time in workdays (and even weekends) for studying.
+3.  Go out is probably going to rise the amount of alcohol, because usually people drink alcohol when partying and going out.
+4.  And lastly absences might be a consequence of drinking alcohol, so there might be positive relationship between those variables.
+
+Exploring the chosen variables:
+
+```{r}
+
+#Absences
+#Numeric values
+data$absences %>% mean
+data$absences %>% min
+data$absences %>% max
+
+#table for the distribution of the answers
+table(high_use = data$high_use, absences = data$absences)
+
+#Check the distribution of the variable  
+hist(data$absences)
+
+
+```
+
+```{r}
+
+#plot the "relationship" between response variable and explanatory variable
+absences_plot <- ggplot(data, aes(x = high_use, y = absences,col = sex))
+
+# define the plot as a box plot and draw it
+absences_plot + geom_boxplot()
+
+
+
+```
+
+Numerically absences varied between 0 and 45 absences and on average there were about 4.5 absences.
+From the histogram is possible to see that most people have less than 10 absences and there is only few people with more than 20 absences.
+Based on the box plot it would seem that there is little bit greater range in absences for people with high alcohol consumption.
+Also the median value might be little bit higher for men who drink more alcohol than those how drink less.
+But it cannot be said unequivocally that higher alcohol consumption leads to more absences.
+Still there might be positive correlation between those two variables.
+Also the boxplot might not be the best choice to interpret the relationship between these two variables, but it was the one that was used in the exercises so i used it as well.
+
+```{r}
+
+#free time
+#Numeric values
+data$freetime %>% mean
+data$freetime %>% min
+data$freetime %>% max
+
+#table for the distribution of the answers
+table(high_use = data$freetime, freetime = data$freetime)
+
+#Check the distiribution of the variable  
+hist(data$freetime)
+
+```
+
+```{r}
+#plot the "relationship" between response variable and explanatory variable
+freetime_plot <- ggplot(data, aes(x = high_use, y = freetime,col = sex))
+
+# define the plot as a box plot and draw it
+freetime_plot + geom_boxplot()
+
+
+```
+
+Distribution of the free time is almost normally distributed but not quite.
+Most popular answer has been 3 and the highest and lowest values are the least popular ones.
+There does not seem to be any correlation that can be interpreted from the graph in the amount of free time and alcohol consumption.
+The only noticeable differences are the variation in the median values (especially men who drink less alcohol vs more alcohol), as well as the larger range of variation in the amount of free time for women who consume little alcohol.
+Based on these, however, it is not possible to make interpretations about the relationship between the variables.
+Free time has been measured on a scale of 1-5, which partly explains why the ranges are very identical for different alcohol consumption groups.
+
+```{r}
+
+#Going out
+#Numeric values
+data$goout %>% mean
+data$goout %>% min
+data$goout %>% max
+
+#table for the distribution of the answers
+table(high_use = data$goout, goout = data$goout)
+
+#Histogram about the distribution
+hist(data$goout)
+
+```
+
+```{r}
+#plot the "relationship" between response variable and explanatory variable
+goout_plot <- ggplot(data, aes(x = high_use, y = goout,col = sex))
+
+# define the plot as a box plot and draw it
+goout_plot + geom_boxplot()
+
+```
+
+In terms of numbers, the going out is in the same category as free time, meaning that there is not difference between min, max or mean values.
+Histogram show a difference because there difference in the distribution of lower and higher values.
+Difference is also clearly visible in the diagram.
+The going out numbers are clearly higher for the people how drink more alcohol than people who do not drink as much.
+This means that my hypothesis might be right.
+
+```{r}
+
+#study time
+#Numeric values
+data$studytime %>% mean
+data$studytime %>% min
+data$studytime %>% max
+
+#table for the distribution of the answers
+table(high_use = data$studytime, studytime = data$studytime)
+
+#Histogram about the distribution
+hist(data$studytime)
+```
+
+```{r}
+#plot the "relationship" between response variable and explanatory variable
+studytime_plot <- ggplot(data, aes(x = high_use, y = studytime,col = sex))
+
+# define the plot as a box plot and draw it
+studytime_plot + geom_boxplot()
+
+```
+
+Most popular answer for study time has been 2, and there is zero answer on the option 5.
+There also has been more answers on the lower end than higher end.
+
+Well for women my hypothesis might be true, but it is impossible to say.
+All the median values are in the same line, so based on those values it looks like that there might not be any correlation between study time and alcohol consumption.
+
+## Logistic regression
+
+Next i created a model that uses high use as a response variable and free time, absences, study time and going out as explanatory variables.
+
+```{r}
+
+# create the glm model
+model <- glm(high_use ~ freetime + absences + goout + studytime, data = data, family = "binomial")
+
+# print out a summary of the model
+summary(model)
+
+# print out the coefficients of the model
+coef(model)
+
+```
+
+In the model only the free time variable is not statistically significant.
+AIC value is quite large, implicating that the model does not work as good as it could, but i don't yet have another model to compare the value to so i cant look into it too closely.
+Residuals are definetly not normally distributed.
+Based on the null deviance and residual deviance it is possible to count that the deviance explained is (452.04 - 376.18)/452.04 = 0.167817, meaning that the model explains 17% of the variation in the response variable.
+Based on the coefficients the study time is affecting negatively to the high alcohol consumption and all other variables are affecting positively.
+
+```{r}
+# calculate the odds ratio from the coefficients
+OR <- coef(model) %>% exp
+
+# calculate the confidence intervals
+CI <- confint(model)
+
+# print out the results 
+cbind(OR, CI)
+
+```
+
+In the confidence intervals, none of the variables include the number 1, telling that all the response variables have some kind of relationship with the response variable.
+Go out variable has the highest odd ratio, implicating that going out more will increase the possibility of high alcohol use.
+All together my hypothesis seems to be somewhat correct.
+I was right about the direction of influence between alcohol use and explanatory variables.
+In the hypothesis phase, I didn't think much about which of the variables would be the most important, but I probably would have guessed that going out would be the most important, which is also implied by the results.
+
+## Final model
+
+Because free time is not statistically significant i will remove it from the final model.
+My hypothesis with free time seems to be true because the coefficients implicate that the relationship between free time and high alcohol consumption is positive, meaning that more free time will more likely to lead to more alcohol use.
+But because the relationship is not statistically significant the model is probably better without it.
+
+```{r}
+
+# create the glm model
+model <- glm(high_use ~ absences + goout + studytime, data = data, family = "binomial")
+
+# print out a summary of the model
+summary(model)
+
+# print out the coefficients of the model
+coef(model)
+
+```
+
+Now i have the final model i can use it to predict the high alcohol consumption.
+Before predicting the summary output of the new model is almost same as the last model.
+The AIC value is little bit smaller, but not significantly.
+The good difference is that now all the explanatory variables are statistically significant (p \< 0.05).
+It looks like that the absences and going out are increasing the response variable and study time is decreasing it, meaning that my earlier hypothesis might still be true.
+
+```{r}
+
+#predict the probabilities and safe them in new column in the data set 
+data <- mutate(data, probability = predict(model, type = "response"))
+
+#add the prediction column in the data
+data <- mutate(data, prediction = probability > 0.5)
+
+
+##########################
+
+#Visualize the results
+
+#define the plot
+plot_predic <- ggplot(data, aes(x = probability, y = high_use, col = prediction))
+
+#draw the plot
+plot_predic + geom_point()
+
+```
+
+```{r}
+# first print out just the predicted answer amounts and correct amounts 
+table(high_use = data$high_use, prediction = data$prediction)
+
+#print out all so the probabilities
+table(high_use = data$high_use, prediction = data$prediction) %>% prop.table() %>% addmargins()
+
+```
+
+Based both on the visualization of the results and the table presentation, it looks like that the model is most of the time predicting that the person is not a high user, and fewer times predicting that the alcohol consumption is on the higher end.
+
+## Guessing the results
+
+We want to know can the model perform better than a simple guess, so we can use loss function for that.
+
+```{r}
+
+# define a loss function (average prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# compute the average number of wrong predictions in the (training) data
+loss_func(class = data$high_use, prob = data$probability)
+
+```
+
+```{r}
+#compute the error if none of the people is high user
+loss_func(class = data$high_use, prob = 0)
+
+#compute the error if every one is high user
+loss_func(class = data$high_use, prob = 1)
+```
+
+Okey, looks like that my model has a error rate of 0.23 and if we just guess that none of the people is high alcohol user the result is 0.3.
+This means that my model is more correct than a simple guess, luckily.
+
+## Bonus: 10-fold cross-validation
+
+```{r}
+# K-fold cross-validation
+
+validation <- cv.glm(data = data, cost = loss_func, glmfit = model, K = nrow(data))
+
+# average number of wrong predictions in the cross validation
+
+validation$delta[1]
+
+```
+
+My model haves a little bit better test set performance than the model in the Exercise set.
+Exercise set got the performance value about 0.24 and i have just under that 0.235, but only just...
