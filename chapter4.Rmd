@@ -1,0 +1,302 @@
+---
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Chapter 4 Assignment 4, Clustering and classification
+
+```{r}
+date()
+```
+
+## Libraries
+
+```{r}
+
+library(tidyverse)
+library(MASS)
+library(corrplot)
+library(ggplot2)
+
+```
+
+## Loading the data
+
+Loading the data from the MASS library and looking out the attributes in the data.
+
+```{r}
+
+#load the data
+data("Boston")
+
+#Check the dimensions and structure of the data
+str(Boston)
+dim(Boston)
+
+#brief summary of the variables in the data
+summary(Boston)
+
+```
+
+```{r}
+
+#Graphical overview of the data
+pairs(Boston[1:5])
+pairs(Boston[6:10])
+pairs(Boston[11:14])
+
+```
+
+In the assisment we are using the Boston data set that includes different numerical values for housing values in suburbs of Boston.
+There are 560 rows and 14 variables in the Boston data.
+All the variables are numbers.
+Boston data is part of MASS library and all the information about the variables can also be found [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html).
+
+The variables are as following:
+
+1.  Crim = Per capita crime rate by town.
+    Values between about 0 and 88, with the average being about 3.5.
+
+2.  Zn = proportion of residential land zoned for lots over 25,000 sq.ft.
+    Number between 0-100, and avarage is about 11.
+
+3.  indus = proportion of non-retail business acres per town.
+    Min value in the data is 0.46 and max is 27.74
+
+4.  chas = Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).
+
+5.  nox = nitrogen oxides concentration (parts per 10 million).
+    Deviating between 0.3 to 0.9
+
+6.  rm = average number of rooms per dwelling.
+    Min 3.5 and max 8.7
+
+7.  age = proportion of owner-occupied units built prior to 1940.
+    Number between 0-100, and mean is 68.5
+
+8.  dis = weighted mean of distances to five Boston employment centres.
+    Min is 1 and max is 12.1
+
+9.  rad = index of accessibility to radial highways.
+    Values between 0 to 24
+
+10. tax = full-value property-tax rate per \$10,000.
+    In the data minimum is 187 and max is 711.
+
+11. ptratio = pupil-teacher ratio by town.
+    In the data minimum is 12.60 and max is 22
+
+12. black = indicator for black in town.
+    Minimum in the data is 0.32 and max 396
+
+13. lstat = lower status of the population (percent).
+    Minimum in the data is 1.73 and max 37.9
+
+14. medv = median value of owner-occupied homes in \$1000s.
+    Min is 5 and max value is 50
+
+```{r}
+
+#correlations between different variables
+
+#create the matrix
+cor_matrix <- cor(Boston) 
+
+#print out the numbers in the matrix
+cor_matrix
+
+#print out the visualization
+corrplot(cor_matrix, method="circle")
+
+
+```
+
+In the data there is few variables that correlate highly with each other, for example the nox and indus, dis and age, etc have a correlation over 0.7. But in this case it is not a problem but good thing to keep in mind. Also the chas variable is not correlating highly with any of the other variables. 
+
+Because we are first interested about the crime variable, it is also interesting to see what is its the original distribution. 
+
+
+```{r}
+#distribution of the crim variable in the original data
+hist(Boston$crim)
+
+```
+
+Now it seems that most of the values in crime variable are between 0-10 and only few values are recorded past that point.
+
+## Scale the data
+
+```{r}
+#standardize and scale the variables using scale -function
+boston_scaled <- scale(Boston)
+
+#see how the new variables look
+summary(boston_scaled)
+
+# change the object to data frame for later use
+boston_scaled <- as.data.frame(boston_scaled)
+
+```
+
+In the original data all the values have different ranges of variation.
+After we scale them, all the mean values became 0 and the variations of the variables are on the same scale.
+
+In the research, it is more meaningful and informative that crime can be examined in more informative way, than just a numerical value. By changing the originally numerical data into a categorical one, we can more easily draw conclusions about which areas have low, medium low, medium high or high crime rates. To do that we first need to know the distribution of the data and define reasonable boundaries for desired categories.
+
+```{r}
+
+#create vector for bins
+bins <- quantile(boston_scaled$crim)
+bins
+
+#new variable that includes the different bins for crime
+crime <- cut(boston_scaled$crim, breaks = bins, include.lowest = TRUE, label= c("low", "med_low", "med_high", "high"))
+
+#How many values are in each bin
+table(crime)
+
+#remove original crim from the dataset
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+
+#add the new variable in the data set
+boston_scaled <- data.frame(boston_scaled, crime)
+
+```
+Now we have categorized the crime variable in a way that all the classes have almost the same amount of rows in them. 
+
+## Test and Train
+
+To test and train the data, we need to divide the original data into 80% that will be used to train the algorithm and 20% that will be used to see how well the algorithm works. 
+
+```{r}
+
+# safe the number of rows in the data
+n <- nrow(boston_scaled)
+
+# choose randomly 80% of the rows
+ind <- sample(n,  size = n * 0.8)
+
+# create train set from those 80%
+train <- boston_scaled[ind,]
+
+# create test set from the rest 20%
+test <- boston_scaled[-ind,]
+
+
+```
+
+## Linear discriminant analysis
+
+Now that we have own data for training and own data for testing, we can start doing the linear discriminant analysis. 
+
+```{r}
+
+# Safe the analysis in the new variable
+lda.fit <- lda(crime~., data = train)
+
+#"Summary" of the analysis
+lda.fit
+
+# the function for lda biplot arrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  graphics::arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train$crime)
+
+# Plot the results and wanted arrows
+plot(lda.fit, dimen = 2, col = classes, pch = classes)
+lda.arrows(lda.fit, myscale = 5)
+
+```
+LDA analysis shows how the different variables in the data set compare to the crime rate. All the arrows in the visualization shows the direction in which the variable increases when moving on the graph. The length of the arrow on the other hand describes the intensity of change. For example most of the low and medium low values are located in the are where tax variable is increasing and age is decreasing. 
+
+Now the training is done, so it is time to test how well the algorithm works. First it is needed to safe the correct values in a different variable and remove them form the test data. This way they cannot affect the results of the analysis, which would almost inevitably happen if they remained in the test material. 
+
+```{r}
+
+#Safe the crime categories from the test set
+correct_classes <- test$crime
+
+# remove crime from test set
+test <- dplyr::select(test, -crime)
+
+
+```
+
+And now the test part: 
+
+```{r}
+# predict classes with test aka the 20% of the original data
+lda.pred <- predict(lda.fit, newdata = test)
+
+# cross tabulate the results
+table(correct = correct_classes, predicted = lda.pred$class)
+
+```
+The analysis works quite well for interpreting low, medium high and high crime rate areas. In the medium high there is little bit more error and and surprisingly many of the areas in that category end up in a lower category (low crime rate). 
+
+## Distance analysis
+
+```{r}
+#reload the data
+library(MASS)
+data("Boston")
+
+#Scale the data set
+Boston_standard <- scale(Boston)
+
+#Look how the scaled data looks
+summary(Boston_standard)
+
+#calculate the distances
+dist_boston <- dist(Boston_standard)
+
+# look at the summary of the distances
+summary(dist_boston)
+
+
+```
+Mean distance between the variables is about 5, but there is variation between 0.1 and 14.4. The numerical value reflects the distance between the variables and it is called Euclidean distance, it is not a typical numerical value that has a standard unit. 
+
+## K -means clustering
+
+```{r}
+
+# k-means clustering
+
+
+set.seed(123)
+
+# determine the number of clusters
+k_max <- 10
+
+# calculate the total within sum of squares
+twcss <- sapply(1:k_max, function(k){kmeans(Boston, k)$tot.withinss})
+
+# visualize the results to see the best number of clusters
+qplot(x = 1:k_max, y = twcss, geom = 'line')
+
+```
+
+When visualizing the sum of square it is possible to see that the line drops drastically when the cluster value is 2. This implicates that the right amount of clusters in the analysis is 2. Now we can execute the k-means clustering. And print all the results for the different variables. 
+
+```{r}
+# k-means clustering with best number of clusters
+km <- kmeans(Boston, centers = 2)
+
+# plot the Boston data set with clusters
+pairs(Boston, col = km$cluster)
+pairs(Boston[1:5], col = km$cluster)
+pairs(Boston[6:10], col = km$cluster)
+pairs(Boston[11:14], col = km$cluster)
+```
+
+In the pairs plot, the clusters are visualised for black and red group. Because there is multiple variables one big plot of the results can be hard to interprend, it is good also to visualize the data in smaller groups. 
