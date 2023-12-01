@@ -1,0 +1,224 @@
+---
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Chapter 5, Dimensionality reduction techniques
+
+## Libraries
+
+```{r}
+#needed libraries
+library(tidyverse)
+library(dplyr)
+library(corrplot)
+library(GGally)
+library(FactoMineR)
+library(tidyr)
+```
+
+## The data
+
+First it is needed to read in the data and modify it, so that country names are row names.
+
+```{r}
+#read in the data
+data <- read_csv("data/human.csv")
+
+#change the countries to row names
+data <- column_to_rownames(data, "Country")
+
+#structure and dimensions
+str(data)
+dim(data)
+
+#Summary of the variables in the data
+summary(data)
+
+#Visualisation of the variables 
+ggpairs(data,progress = FALSE )
+
+#correlation visualisation
+cor_matrix <- cor(data) %>% round(digits = 2)
+corrplot(cor_matrix, method="shade")
+```
+
+The data contains 155 rows and 8 columns, and row names are different countries.
+Some details for the variables:
+
+1.  Edu2.FM = Ratio of female and male populations with secondary education in each country, numerical value between 0.17-1.49.
+
+2.  Labo.FM = Ratio of labor force participation of females and males in each country, numerical value between 0.18-1.03
+
+3.  Life.Exp = Numeric variable that indicates Life Expectancy at Birth, values between 49-83.5 years.
+
+4.  Edu.Exp = Numeric variable that indicates Expected Years of Education, value between 5.4-20.20
+
+5.  GNI = Gross National Income (GNI) per Capita, numeric variable between 581-123 124
+
+6.  Mat.Mor = Maternal Mortality Ratio, numeric variable form 1 to 1100
+
+7.  Ado.Birth = Adolescent Birth Rate, numeric variable between 0.6-204.80
+
+8.  Parli.F = Percent Representation in Parliament, numeric variable from 0 to 57.5
+
+In the data there is notable correlations between the variables, if the data is used, for example, in linear regression, this should be taken into account when choosing the variables.
+For example the correlation between life expectancy and maternal mortality, is -0.8, but it is understandable that the life expectancy gets lower when the maternal mortality is high.
+Data for GNI, Mat.Mor, Ado.birth and Parli.F is skewed to the right, i.e. in most countries the values are at the lower end of the scale.
+Lado.FM and Life.Exp on the other hand are more left skewed, meaning that most countries have bigger values on those categories.
+
+## Principal component analysis
+
+First PCA analysis is made for non-standardized data.
+
+```{r}
+#PCA analysis
+pca_non_standard <- prcomp(data)
+
+#Safe the summary of the PCA analysis
+s_NS <- summary(pca_non_standard)
+
+#print out the summary
+s_NS
+
+#Presentages of the pca analysis
+pca_pr_NS <- round(100*s_NS$importance[2, ], digits = 1)
+
+#print out the presentages 
+pca_pr_NS
+
+#create object that helps with the labesl
+pc_lab_NS <- paste0(names(pca_pr_NS), " (", pca_pr_NS, "%)")
+
+# draw a biplot
+biplot(pca_non_standard, cex = c(0.8, 1), col = c("grey40", "deeppink2"), xlab = pc_lab_NS[1], ylab = pc_lab_NS[2]) + title("PCA for non standardized data", line = 3)
+```
+
+Because the data is not standardized the results are not very good, or easily interpretable.
+(More interpretations will come later).
+Lets see how the results change when the data is standardized.
+Standardizing the data modifies it so that all the mean values became 0 and the data varies on both sides of it.
+The values contained in the different columns of the data are thus better compared to each other.
+
+```{r}
+#standardize the data
+data_std <- scale(data)
+
+#how the data looks now? 
+summary(data_std)
+
+#Make the PCA again
+pca_std  <- prcomp(data_std)
+
+#Safe the summary of the PCA analysis
+s <- summary(pca_std)
+
+#print out the summary
+s
+
+#Presentages of the pca analysis
+pca_pr <- round(100*s$importance[2, ], digits = 1)
+
+#print out the presentages 
+pca_pr
+
+#create object that helps with the labesl
+pc_lab <- paste0(names(pca_pr), " (", pca_pr, "%)")
+
+# draw a biplot
+biplot(pca_std, cex = c(0.6, 0.7), col = c("lightgrey", "darkblue"), xlab = pc_lab[1], ylab = pc_lab[2]) + title("PCA for standardized data", line = 3)
+```
+
+Now the results are more clear.
+PCA analysis tries to create new uncorrelated variables that explain as much as possible for the variation in the original data, to create lower-dimensional summary of the original data.
+For the analysis made with non standardized data, the analysis has not been able to really create those variables, because as a result the first variable (PC1) is explaining 100% of the variation and because this the second variable (PC2) is explaining 0%.
+Only really visible original variable in the plot is GNI (Gross National Income per capita), probably because its values are so much higher than other variables.
+Because of this it is quite impossible to say anything specific about the results themselves.
+
+PCA analysis made for standardized data is much more realistic, and this time the first variable is explaining 53.6% of the variation and second 16.2%.
+In the results the Labo (Ratio of labor force participation of females and males in each country) can be used to describe how equal the community is from the point of view of women's employment.
+Parli (Percent Representation in Parliament) variable arrow on the other hand is implying what kind of influence opportunities women have.
+Together these original variable arrows are pointing on somewhat same direction making a clear distinction between the equality in different countries.
+Women's participation in working life and politics are also implications of women's ability to decide on their own lives and public activities.
+In the countries that are placed on the opposite side of these arrows women could be mostly in home and taking care of children, and all the important decisions are made by other (possibly male) relatives.
+Countries located near the Mat.Mor (Maternal Mortality Ratio) and Ado.Birth (Adolescent Birth Rate) arrows can be used to indicate countries where mothers are younger and where possibly the health care is poorer or not easily available.
+Also due to younger age of mothers it is more likely to get possible deadly complications when giving birth.
+It is also possible that in those countries the contraceptives are not so easily available.
+In the opposite side of these variables are countries where education rates and life expectancy are higher.
+This indicates that in the countries where education is more available (especially for women) the teenage pregnancies are rarer, probably due to better sex education and different life choice options.
+
+Overall the PCA analysis is describing the gender equality in different countries and how it is shown in different areas of life.
+In the PCA analysis done with non-standardized data the first variable is mostly based on the Gross National Income and all of the deviation is created based on that.
+In the standardized analysis the first variable (that explains 53% of the variation) is created from positive influence of level of education and educational opportunities and negative influence of teenage pregnancies and maternal mortality, to define the location of different countries.
+The second variable (that explains 16%) is based on the influence of labor force and women participation of parliament, and the new variable describes the gender equality in different countries.
+
+## Multiple Correspondence Analysis
+
+First read in the tea data:
+
+```{r}
+
+#read in the data
+tea <- read.csv("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/tea.csv", stringsAsFactors = TRUE)
+
+#visually check the data
+#View(tea) (i change this to comment because it was "problem" when knitting)
+
+#dimensions and stucture of the data
+str(tea)
+dim(tea)
+
+#there is 300 observations and 36 different variables
+```
+
+Because there is so many variables in the data, i chose to select only few variables in the further analysis.
+I chose to use frequency (how often tea is drank), age (age group of the person answering the question), Tea (what kind of tea is persons drinking), Sugar (with or without sugar), tea.time (does the person have specific time for drinking tea), breakfast (does person drink tea in breakfast), lunch (does person drink tea in lunch), dinner (does person drink tea in dinner) and work (do people drink tea in work or not).
+
+```{r}
+
+#vector that includes the chosen variables
+keep_columns <- c("frequency", "age_Q", "Tea", "sugar", "tea.time", "breakfast", "work", "lunch", "dinner")
+
+#create new data set for chosen variables
+tea_time <- dplyr::select(tea, keep_columns)
+
+#summary of the data
+summary(tea_time)
+
+# visualize the variables
+library(ggplot2)
+pivot_longer(tea_time, cols = everything()) %>% 
+  ggplot(aes(value)) + facet_wrap("name", scales = "free") +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+```
+
+In the chosen variables the sugar and no sugar and breakfast and not breakfast drinkers are divided on somewhat equally, but there are more people who don't drink tea in lunch or dinner than those who do.
+Most people's drink choice is Earl Grey.
+People seem to drink tea mostly daily, either one or more than two cups.
+All the different age groups seem to be presented quite well, but there is slightly more people in the 15-24 age group than other groups.
+More people also don't drink tea at work.
+
+```{r}
+#do the MCA analysis
+mca <- MCA(tea_time, graph = FALSE)
+
+# summary of the model
+summary(mca)
+
+# visualize MCA
+plot(mca, invisible=c("ind"), graph.type = "classic", habillage = "quali")
+
+```
+
+In the MCA model with two-dimensional map, only 23% of the total inertia is explained, so there could be a need for more dimensions or further analysis.
+The first dimension is explaining a little bit under 13% and second little bit over 10%.
+Based on the visualization, the first variable is describing the different times people drink tea and second is describing the different types of tea drinking habits and age groups.
+Results of the analysis say that older people prefer to drink green or black tea and younger people drink Earl grey and possibly with sugar.
+Also older people might have a specific tea time, while younger people don't have a specific tea drinking time.
+Also breakfast and dinner points are located quite far from each other so it could be argued that people how drink coffee in the morning don't drink it in the evening and other way around.
+Also points for people who drink tea in the breakfast and people who drink more than 2 cups in a day are very close to each other.
+This means that people who drink morning tea probably drink tea more than two cups.
+Same thing is for lunch and work points, but that also can be caused by coincidence because people are usually in work by lunch time.
+Altogether i think that MCA is quite good tool for visual analysis of factor data, but it takes some time to get used to it.

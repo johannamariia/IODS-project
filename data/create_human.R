@@ -50,11 +50,68 @@ human <- hd %>%
 write_csv(human,"data/human.csv")
 
 #read the data again to check it
+human <-  read_csv("data/human.csv")
+
+#structure of the data
+str(human)
+
+#first rows in the data
+head(human)
+
+#summary
+summary(human)
+
+#The data "Human" includes 195 rows and 19 columns. Included variables are:
+#HDI.rank = Human development index ranking
+#Country = character variable that indicates different countries on the data
+#HDI2 = Human development index 
+#Life.Exp = numeric variable that indicates Life Expectancy at Birth
+#Edu.Exp = Numeric variable that indicates Expected Years of Education
+#Edu.mean = Mean years of education, numeric value
+#GNI = Gross National Income (GNI) per Capita, numeric variable
+#GNI.minus.rank = Gross national income per capita minus the ranking
+#GII.rank =  Gender Inequality Index ranking
+#GII =  Gender Inequality Index
+#Mat.Mor = Maternal Mortality Ratio, numeric variable
+#Ado.Birth = Adolescent Birth Rate, numeric variable
+#Parli.F = Percent Representation in Parliament, numeric variable
+#Edu2.F = Population with Secondary Education (Female), numeric variable
+#Edu2.M = Population with Secondary Education (Male), numeric variable
+#Labo.F = Labour Force Participation Rate (Female), numeric variable
+#Labo.M = Labour Force Participation Rate (Male), numeric variable
+#Edu2.FM = ratio of female and male populations with secondary education in each country
+#Labo.FM = ratio of labor force participation of females and males in each country
+
+#define vector that includes only the important rows. 
+keep <- c("Country", "Edu2.FM", "Labo.FM", "Life.Exp", "Edu.Exp", "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
+
+#use select funktion to keep only previously defined columns
+human <- dplyr::select(human, one_of(keep))
+
+#remove all the NA values
+human <- filter(human, complete.cases(human)) 
+
+#check how many rows are not countries 
+tail(human, 10)
+#Niger is last country on the list so we want to remove all the rows under that.
+
+# define the last row we want to keep
+last <- nrow(human) - 7
+
+# choose everything until the last 7 observations
+human <- human[1:last, ]
+
+#write the data again
+write_csv(human,"data/human.csv")
+
+#and final check that everything is correct. 
 data_final <-  read_csv("data/human.csv")
 
 #structure of the data
 str(data_final)
 
-#first rows in the data
-head(data_final)
+#last rows in the data to see that there is only countries
+tail(data_final,10)
 
+#summary to see that there is no more NA values
+summary(data_final)
