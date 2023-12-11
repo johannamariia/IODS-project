@@ -1,0 +1,370 @@
+---
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+
+# Chapter 6, Analysis of longitudinal data
+
+## Libraries
+
+All the libraries that will be needed in the codes later.
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)
+
+
+```
+
+
+## Read in the data
+
+Lets bring in the data that has been made in data wrangling part. Because R did not safe the information about factor variables it is needed to define them again. 
+```{r}
+
+#Read in the data
+
+BPRS <- read_csv("data/BPRS.csv")
+
+RATS <- read_csv("data/RATS.csv")
+
+#change variables to factors
+BPRS$treatment <- as.factor(BPRS$treatment)
+BPRS$subject <- as.factor(BPRS$subject)
+
+RATS$Group <- as.factor(RATS$Group)
+RATS$ID <- as.factor(RATS$ID)
+
+#Structure of the data
+str(BPRS)
+str(RATS)
+
+#dimensions
+dim(BPRS)
+dim(RATS)
+
+#summary
+summary(BPRS)
+summary(RATS)
+```
+
+The BPRS data includes data from brief psychiatric rating scale, that was used to indicate how well two different treatments where working for 40 different male subjects (20 for group one and 20 for group 2) in 8 weeks study period. The data sets includes 5 variables: treatment (what treatment they were getting (factor value 1 or 2)), subject (factor value from 1 to 20 indicating the male subject), weeks (information about original week column where the data is from), bprs (results for the test) and week (week number). Overall there is 360 observations in those 5 columns. However, the important thing to note when processing the data, is that the different research subjects do not have a unique id code, but the id numbers are the same in both groups. So the group id is necessary when differentiating the results. 
+
+RATS data is from nutrition study where rats were put in three different groups. Each of those groups got different diets and the weight of each rat in the group was recorded weekly for 9 weeks. The data for RATS includes 5 variables: id (factor identification for the rat), group (factor identification about which group the rat is in), WD (information about original week column), weight (rats weight in grams) and time (the week number extracted from original WD information). Measurements where taken in once a week, but in week seven (in the data numbers 43 and 44) two measurements where taken. 
+
+
+## Analysis for RATS data
+
+First visualize the data for each of the rats in different groups. 
+
+```{r}
+
+#Plot the data for each group and each individual
+ggplot(RATS, aes(x = Time, y = Weight, group = ID)) +
+  geom_line() +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ Group, labeller = label_both) +
+  theme(legend.position = "none") + 
+  scale_y_continuous(limits = c(min(RATS$Weight), max(RATS$Weight)))
+```
+
+Okey, looks like that, in the group 1 the rats have been overall smaller than in groups 2 or 3. Also the group 1 includes 8 rats, and 2 and 3 only 4 each. Because the study is about how the weight is changing between weeks and not the actual weight value, it is good to standardize the values. This way it is possible to focus only on the change in weight. This can be done by subtracting the average of the weight from the original weight and dividing it by standard deviation. 
+
+
+```{r}
+
+#Standardize the weight variable
+RATS <- RATS %>%
+  group_by(Time) %>%
+  mutate(stdweight = (Weight - mean(Weight))/sd(Weight)) %>%
+  ungroup()
+
+#How does it look now?
+glimpse(RATS)
+
+#Plot the new standardized weights
+ggplot(RATS, aes(x = Time, y = stdweight, group = ID)) +
+  geom_line() +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ Group, labeller = label_both) +
+  scale_y_continuous(name = "standardized weight")
+```
+
+Now all the weights are in the same scale, but because the group one was different in the original data it is little bit different here as well.  But because it is more useful to investigate the overall change that different diets caused, than each individual in each group. In this case it is useful to calculate standard error of mean. But because there is 8 rats in the first group and 4 in other groups, we cannot just count the mean values with predefined group size. In this case we can use the count = n() to use the number of values in each group defined by group_by function. 
+
+```{r}
+
+# Summary data
+RATS2 <- RATS %>%
+  group_by(Group, Time) %>%
+    summarise( mean = mean(Weight), se = (mean(Weight)/ sqrt((count = n()))))%>%
+  ungroup()
+
+# Glimpse the data
+glimpse(RATS2)
+
+# Plot the mean profiles
+ggplot(RATS2, aes(x = Time, y = mean, linetype = Group, shape = Group)) +
+  geom_line() +
+  scale_linetype_manual(values = c(1,2,3)) +
+  geom_point(size=3) +
+  scale_shape_manual(values = c(1,2,3)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se, linetype="1", color= Group), width=0.4) +
+  theme(legend.position = c(0.8,0.8)) +
+  scale_y_continuous(name = "mean(Weight) +/- se(Weight)")
+
+```
+
+In the visualization the error bars for different groups are not really visible, or it is hard to tell them apart, but coloring them helps a little bit. The biggest error bars are for groups 2 and 3 whereas group 1 got the smallest errors. But overall all it seems that groups 2 and 3 are getting more weight than group 1, but the difference is not huge and considering the error bar size, it is impossible to say anything about the results for sure from the graph alone.
+
+Now it is time to check that is there any outliers in the data. In the exercise set the summary measure is made by using the mean value over the study period. Lets first to the same for the Rats data
+
+```{r}
+
+#Summary data, group by group and id
+RATSMEAN <- RATS %>%
+  filter(Time > 1) %>%
+  group_by(Group, ID) %>%
+  summarise ( mean = mean(Weight)) %>%
+  ungroup()
+
+#How the data looks
+glimpse(RATSMEAN)
+
+#Boxplot f the mean vs group
+ggplot(RATSMEAN, aes(x = Group, y = mean)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "mean(Weight)")
+```
+
+In the boxplot it is possible to see that in each group there is one outlier. But in the rats data, the study question was, how different diets affect on weight. This is the reason why i am not sure does this tells us really anything useful. It just shows 3 rats whose mean weight is lover or higher than others in that group. But it does not necessary mean that those are biased values, because the rat could have been heavier or lighter to start with. But if the study specifically chose to use rats in the same weight group to begin with, then those values can be seen as outliers. 
+
+I still want to see would those values be outliers also if the summary measure is done by looking at the change in weight over the study period.  
+
+```{r}
+
+#Summarise by cheking the change in weight over study period
+RATSMEAN2 <- RATS %>%
+  filter(Time > 1) %>%
+  group_by(Group, ID) %>%
+  summarise ( sum = Weight[10] - Weight[1]) %>%
+  ungroup()
+
+#How the data looks
+glimpse(RATSMEAN2)
+
+#Boxplot of the change vs group
+ggplot(RATSMEAN2, aes(x = Group, y = sum)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "Weight change")
+```
+
+And the answer to my own question is apparently no. There are not same amount of outliers. Now there is only one outlier in the group 2 that weigh has not change as much as others in that same group, meaning that there might have been some other variable affecting the results. 
+
+But i assume that the idea in the study was to use rats that are in the same weight group (other words they weight was almost same in the start of the study), meaning that there is 3 outliers that shall be removed. So lets remove them...
+
+```{r}
+
+RATSMEAN <- RATSMEAN %>%
+  filter(mean < 550) %>% #this will remove the outlier in group 2
+  filter(mean > 250) %>% #this will remove the outlier in group 1
+  filter(mean > 500 | mean < 480) #this will remove the outlier in group 3
+
+#Check again that there is now 7 rats in group 1, and 3 rats in rest of the groups.
+summary(RATSMEAN)
+
+#Looks good
+
+#Plot the results 
+ggplot(RATSMEAN, aes(x = Group, y = mean)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "mean(Weight)")
+
+```
+
+Now there is no more outliers. The mean weight inside groups is very similar, and as stated before the rats in group one are lightest and in the group three the rats are heaviest.  In all the groups the the median value is on lower (groups 1 and 3) or on heavier (group 2) side of the values, meaning that all the summary measures are somewhat skew. 
+
+Because there is more than two groups in the study, it will not be possible to use t-test. T-test is only possible to run for 2 groups. It could be possible to run the test for every combination of 2 groups that can be formed from those original 3 groups, but i don't think it would give any statistically correct information. Other option would be to combine the groups 2 and 3, but that would be more wrong in scientific sense, because they have different diets, so they are not the same.
+
+It is possible to run ANOVA test for this data, because it can be applied for more than two groups. First step is to fit linear model in the data where the mean value is the response variable and group is explanatory variable. Second step is to add the results in anova. 
+
+```{r}
+#fit the linear model
+fit <- lm(mean ~ Group, data = RATSMEAN)
+
+#fit the anova
+anova <- aov(fit, data = RATSMEAN)
+
+# Summary of anova
+summary(anova)
+
+#coefficients
+anova$coefficients
+
+```
+
+Anova test tells that the group is statistically significant when explaining the mean weight, but obviously it is because of the different size/weights rats in the beginning of the study. The coefficients show that the group 2 will increase rats weight by 183g and group 3 even more.. 
+
+Just for the curiosity, i want to see what kind of results i would get if i would have chosen to study the change in weight instead of mean weight: 
+```{r}
+
+#fit the linear model
+fit1 <- lm(sum ~ Group, data = RATSMEAN2)
+
+#fit the anova
+anova1 <- aov(fit1, data = RATSMEAN2)
+
+# Summary of anova
+summary(anova1)
+
+#coefficients
+anova1$coefficients
+```
+
+Now the group is little bit less significant and the coefficients tell that group two will increase the starting weight more than group 3. So that would be some kind of result... 
+
+Side note: 
+I think that these analysis steps are good, but with this kind of data they are not telling much... I didn't quite understand what kind of variation in the rat data, would have been wanted to be studied with the help of these methods, which is why the analyzes have been made following the examples of the study material. And that is the reason i don't think the results tell anything really important. 
+
+## Analysis for BPRS data
+
+Lets check the BPRS data again, just to remind of how does it look. And also plot the data. Because the visualization that was made for Rats data in the exercise part II, would not work with BPRS data i chose to do two different kind of visualization for it, just to try which is better. 
+
+```{r}
+
+#sneak peak of the data
+glimpse(BPRS)
+
+#Still looks correct :D
+
+#plot
+ggplot(BPRS, aes(x = week, y = bprs, group = treatment)) +
+  geom_point(aes( colour= treatment))+
+  scale_x_continuous(name = "Week", breaks = seq(0, 8, 2)) +
+  scale_y_continuous(name = "BPRS")+
+  theme(legend.position = "top")
+
+  
+
+```
+Well, it is not the best, but it could be worse... Now it is possible to see how the BPRS values are distributed weekly, and would be somewhat possible to say that in weeks 5to 7 the lowest values are lower than in weeks 0 to 2. Also it is possible to look how different treatment groups are affecting the points location. However it is not possible to see how values change based on different subjects, and by changing the colour to represent the subject and shape of the point to represent different treatment, the visualization would be too complicated to interpret. 
+
+And now the other way to make the visualisation. 
+```{r}
+
+#plot the data again
+ggplot(BPRS, aes(x = week, y = bprs, linetype = subject)) +
+  geom_line(aes(colour=subject, group=subject)) +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ treatment, labeller = label_both) +
+  scale_y_continuous(name = "BPRS") +
+  theme(legend.position = "top")
+
+
+```
+
+Now the visualization is maybe most informative. Now it is easy to compare the two treatment groups and same time see how value is changing for each subject. Only not so informative thing is the fact that different kind of line types are really close to each other, so without colours it would be hard to differentiate them. But now the main goal is to see the overall difference and not to study only one individual, so it does not matter so much. 
+
+First lets see how the linear model looks like if its made for BPRS data. 
+
+```{r}
+#Fit the linear model
+model <- lm(bprs ~ week + treatment, data = BPRS)
+
+#summary of that model
+summary(model)
+
+#and anova test also
+anova(model)
+```
+
+In the linear model, the week variable is statistically significant, but the treatment type is not. 
+
+It is possible that the variables are already independent from each other, if the patients are not aware of each other. If they are in the same place and interact with each other then there might be some correlation. There might be some kind of correlation between answers that the same person is giving, if they based their new answer knowingly or unknowingly to last week's answers.
+
+But for the purpose of this analyses lets assume that they might not be independent. And that why it is needed to perform random intercept model. 
+
+
+```{r}
+# Create a random intercept model
+BPRS_ref <- lmer(bprs ~ week + treatment + (1 | subject), data = BPRS, REML = FALSE)
+
+# Print the summary of the model
+summary(BPRS_ref)
+
+```
+In the new model the variance and standard deviation are relatively small. This implies that the improvement in the performance of the original model is not very big and if we compare the values produced by other models, there are no significant changes in them. BPRS values seems to differ from each other enough to not greate huge error in the model. 
+
+Further more we can modify the model to also take account the differences not only in different subjects but in different weeks. 
+
+```{r}
+#Create random slope model
+BPRS_ref_slope <- lmer(bprs ~ week + treatment + (week | subject), data = BPRS, REML = FALSE)
+
+#summary of slope model
+summary(BPRS_ref_slope)
+
+```
+New model also takes account for different weeks, and looking at the summary, there is only a little difference. The amount of variance is little bit higher in the random effect but standard deviation is lower than in the previous model. In the fixed effects there is lower values in the t values. 
+
+Now when both of the models are created we can compare them to each other with the help of anova test. 
+
+```{r}
+
+#ANOVA
+anova(BPRS_ref_slope, BPRS_ref)
+
+```
+The anova test shows the same thing that i kind of already said, so the model that takes account also the different weeks when separating the subjects is better, but the difference is not huge. This way it is possible to make a cautious assumption that the values have not correlated with each other very strongly in the first place. But there still has been some correlation so it cannot be said that they are completely independent. 
+
+Now we can add also the interaction variable in to the models. So lets see how the interaction between week and treatment is changing the results and compare it to the better previous model. 
+
+```{r}
+
+#Model with the interaction variable
+BPRS_ref_slope2 <- lmer(bprs ~ week + treatment + week*treatment + (week | subject), data = BPRS, REML = FALSE)
+
+#summary for that variable
+summary(BPRS_ref_slope2)
+
+#compare the two models
+anova(BPRS_ref_slope, BPRS_ref_slope2)
+```
+Based on the anova test and likelihood ratio test chi-squared value, the new model is performing almost the same as the previous model. The difference is not statistically significant, but the values are still pretty good, so the model seem to perform quite well in this case. 
+
+When the best model is created, it is time to see how it would predict measurement results, by fitting the model in the data set. And then print out the fitted values and the original values. 
+
+```{r}
+#safe the new values in the variable
+Fitted <- fitted(BPRS_ref_slope2)
+
+#Add the values in the data
+BPRS <- mutate(BPRS, Fitted)
+
+#Print the original values again
+ggplot(BPRS, aes(x = week, y = bprs, linetype = subject)) +
+  geom_line(aes(colour=subject, group=subject)) +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ treatment, labeller = label_both) +
+  scale_y_continuous(name = "BPRS", limits = c(10,100)) +
+  theme(legend.position = "top")
+
+#Print the fitted values
+ggplot(BPRS, aes(x = week, y = Fitted, linetype = subject)) +
+  geom_line(aes(colour=subject, group=subject)) +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ treatment, labeller = label_both) +
+  scale_y_continuous(name = "Fitted BPRS", limits = c(10,100)) +
+  theme(legend.position = "top")
+
+
+```
+
+By scaling the y axis, comparing two different graphs with each other is easier. The fitted values are presumably much more straightforward than the real values, creating an easier-to-interpret graph of the effect of different treatments. In real data graphs, the values may also increase during the weeks at individual subjects, but the adjusted values show the direction of change in a simpler way. Both treatment methods lead to a decrease in BPRS values. Treatment one would seem to cause a steeper drop in BPRS values than treatment 2, but the final range of results is similar. So, based on these analyses, it could be said that treatment one might decrease the values obtained by an individual subject faster than treatment type two. However, when examining the entire research material, the treatment two gets very similar overall results, although the results obtained by a single research subject are not as dramatic. But if we look just the original data the range of results seems to be greater for treatment 2 than the treatment 1. But it is good to keep in mind that when making the analysis the values where not scaled nor the outliers where removed. So, there might be some errors in the results because of that. 
